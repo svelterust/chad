@@ -1,5 +1,7 @@
 const std = @import("std");
+const lexer = @import("lexer.zig");
 
 pub fn main() !void {
-    std.debug.print("Hey there, John!\n", .{});
+    const file = @embedFile("examples/hello.chad");
+    std.debug.print("{s}\n", .{file});
 }
