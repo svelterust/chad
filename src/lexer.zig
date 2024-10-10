@@ -17,25 +17,26 @@ pub const TokenType = enum {
     // Literals
     string,
     number,
+    boolean,
     identifier,
 
     // Keywords
     function,
 };
 
-const Scanner = struct {
+const Lexer = struct {
     index: usize,
-    input: []const u8,
+    src: []const u8,
 
-    fn init(input: []const u8) Scanner {
-        return Scanner{ .index = 0, .input = input };
+    fn init(input: []const u8) Lexer {
+        return Lexer{ .index = 0, .src = input };
     }
 
-    fn next(self: *Scanner) ?Token {
-        while (self.index < self.input.len) {
+    fn next(self: *Lexer) ?Token {
+        while (self.index < self.src.len) {
             defer self.index += 1;
-            const current = self.input[self.index];
-            const slice = self.input[self.index .. self.index + 1];
+            const current = self.src[self.index];
+            const slice = self.src[self.index .. self.index + 1];
 
             // Return token based on current character
             switch (current) {
@@ -52,9 +53,9 @@ const Scanner = struct {
                 // String
                 '"' => {
                     // Find matching quote
-                    for (self.input[self.index + 1 ..], 0..) |c, i| {
+                    for (self.src[self.index + 1 ..], 0..) |c, i| {
                         if (c == '"') {
-                            const string = self.input[self.index .. self.index + i + 2];
+                            const string = self.src[self.index .. self.index + i + 2];
                             self.index += string.len - 1;
                             return .{ .type = .string, .value = string };
                         }
@@ -65,21 +66,29 @@ const Scanner = struct {
                 // Identifier
                 'a'...'z', 'A'...'Z', '_' => {
                     // Find end of identifier
-                    for (self.input[self.index..], 0..) |c, i| {
+                    for (self.src[self.index..], 0..) |c, i| {
                         if (!std.ascii.isAlphanumeric(c) and c != '_') {
-                            const identifier = self.input[self.index .. self.index + i];
+                            const identifier = self.src[self.index .. self.index + i];
                             self.index += i - 1;
-                            return .{ .type = .identifier, .value = identifier };
+
+                            // Check if identifier is a keyword
+                            if (std.mem.eql(u8, identifier, "fn")) {
+                                return .{ .type = .function, .value = identifier };
+                            } else if (std.mem.eql(u8, identifier, "true") or std.mem.eql(u8, identifier, "false")) {
+                                return .{ .type = .boolean, .value = identifier };
+                            } else {
+                                return .{ .type = .identifier, .value = identifier };
+                            }
                         }
                     }
                 },
 
                 // Number
-                '0'...'9' => {
+                '-', '0'...'9' => {
                     // Find end of number
-                    for (self.input[self.index..], 0..) |c, i| {
-                        if (!std.ascii.isDigit(c)) {
-                            const number = self.input[self.index .. self.index + i];
+                    for (self.src[self.index..], 0..) |c, i| {
+                        if (!std.ascii.isDigit(c) and !(c == '-' and i == 0)) {
+                            const number = self.src[self.index .. self.index + i];
                             self.index += i - 1;
                             return .{ .type = .number, .value = number };
                         }
@@ -94,20 +103,19 @@ const Scanner = struct {
     }
 };
 
-pub fn tokenize(alloc: std.mem.Allocator, input: []const u8) !ArrayList(Token) {
-    // Lex tokens from input
+pub fn lex(alloc: std.mem.Allocator, input: []const u8) !ArrayList(Token) {
+    // Lex input
     var tokens = ArrayList(Token).init(alloc);
-    var scanner = Scanner.init(input);
+    var scanner = Lexer.init(input);
     while (scanner.next()) |token|
         try tokens.append(token);
     return tokens;
 }
 
-test "tokenize" {
+test "lex" {
+    // Lex input
     const input = @embedFile("examples/hello.chad");
-    var tokens = try tokenize(std.testing.allocator, input);
+    var tokens = try lex(std.testing.allocator, input);
+    std.debug.assert(tokens.items.len == 16);
     defer tokens.deinit();
-    for (tokens.items) |token| {
-        std.debug.print("{any} {s}\n", .{ token.type, token.value });
-    }
 }
