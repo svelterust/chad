@@ -3,14 +3,10 @@ const lexer = @import("lexer.zig");
 const assert = std.debug.assert;
 const ArrayList = std.ArrayList;
 
-const Value = union(enum) {
+const Node = union(enum) {
     boolean: bool,
     number: i64,
     string: []const u8,
-};
-
-const Node = union(enum) {
-    value: Value,
     function_call: struct {
         name: []const u8,
         arguments: []const Node,
@@ -125,14 +121,14 @@ const Parser = struct {
                 // Value
                 .boolean => {
                     const boolean = if (std.mem.eql(u8, current.value, "true")) true else false;
-                    return .{ .value = .{ .boolean = boolean } };
+                    return .{ .boolean = boolean };
                 },
                 .number => {
                     const number = try std.fmt.parseInt(i64, current.value, 10);
-                    return .{ .value = .{ .number = number } };
+                    return .{ .number = number };
                 },
                 .string => {
-                    return .{ .value = .{ .string = current.value } };
+                    return .{ .string = current.value };
                 },
 
                 // Unexpected character
@@ -158,14 +154,19 @@ test "parse" {
     defer arena.deinit();
     const alloc = arena.allocator();
 
+    // Writer for debugging
+    const writer = std.io.getStdOut().writer();
+
     // Lex input
     const input = @embedFile("examples/hello.chad");
     const tokens = try lexer.lex(alloc, input);
-    for (tokens.items) |token|
-        std.debug.print("{} {s}\n", .{ token.type, token.value });
+    try writer.print("Tokens: ", .{});
+    try std.json.stringify(&tokens.items, .{ .whitespace = .indent_2 }, writer);
+    try writer.print("\n\n", .{});
 
     // Parse tokens
     const ast = try parse(alloc, tokens.items);
-    for (ast.items) |node|
-        std.debug.print("{}\n", .{node});
+    try writer.print("AST: ", .{});
+    try std.json.stringify(&ast.items, .{ .whitespace = .indent_2 }, std.io.getStdOut().writer());
+    try writer.print("\n\n", .{});
 }

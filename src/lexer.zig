@@ -1,4 +1,5 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const ArrayList = std.ArrayList;
 
 pub const Token = struct {
@@ -121,5 +122,5 @@ test "lex" {
     // Lex input
     const input = @embedFile("examples/hello.chad");
     const tokens = try lex(alloc, input);
-    std.debug.assert(tokens.items.len == 16);
+    assert(tokens.items.len == 16);
 }
