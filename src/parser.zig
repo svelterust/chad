@@ -1,5 +1,6 @@
 const std = @import("std");
 const lexer = @import("lexer.zig");
+const assert = std.debug.assert;
 const ArrayList = std.ArrayList;
 
 const Value = union(enum) {
@@ -16,7 +17,7 @@ const Node = union(enum) {
     },
     function_decl: struct {
         name: []const u8,
-        arguments: []const Node,
+        parameters: []const Node,
         body: []const Node,
     },
 };
@@ -40,41 +41,85 @@ const Parser = struct {
                 // Function
                 .function => {
                     // Name of function
-                    const name = self.tokens[self.index + 1].value;
+                    const name_start = self.index + 1;
+                    assert(self.tokens[name_start].type == .identifier);
+                    const name = self.tokens[name_start].value;
 
                     // Parameters of function
                     const args_start = self.index + 2;
+                    assert(self.tokens[args_start].type == .left_paren);
                     const args_end = blk: {
                         for (self.tokens[args_start..], 0..) |token, i|
                             if (token.type == .right_paren) break :blk args_start + i;
                         return error.FunctionMissingRightParen;
                     };
-                    const arguments = if (args_end - args_start <= 1) [_]Node{} else return error.ParametersNotSupported;
+                    assert(self.tokens[args_end].type == .right_paren);
+
+                    // Parse arguments to node
+                    const parameters = blk: {
+                        var parser = Parser.init(self.alloc, self.tokens[args_start + 1 .. args_end]);
+                        var nodes = ArrayList(Node).init(self.alloc);
+                        while (try parser.next()) |node|
+                            try nodes.append(node);
+                        break :blk nodes;
+                    };
 
                     // Body of function
-                    const body_start = args_end + 2;
+                    const body_start = args_end + 1;
+                    assert(self.tokens[body_start].type == .left_brace);
                     const body_end = blk: {
                         for (self.tokens[body_start..], 0..) |token, i|
                             if (token.type == .right_brace) break :blk body_start + i;
                         return error.FunctionMissingRightBrace;
                     };
-                    const body = self.tokens[body_start..body_end];
+                    assert(self.tokens[body_end].type == .right_brace);
 
-                    // Create temporary parser with tokens of body and collect nodes
-                    var parser = Parser.init(self.alloc, body);
-                    var nodes = ArrayList(Node).init(self.alloc);
-                    while (try parser.next()) |node|
-                        try nodes.append(node);
-
-                    // Return function
-                    defer self.index += body_end;
-                    return .{
-                        .function_decl = .{
-                            .name = name,
-                            .arguments = &arguments,
-                            .body = nodes.items,
-                        },
+                    // Parse body of function
+                    const body = blk: {
+                        var parser = Parser.init(self.alloc, self.tokens[body_start + 1 .. body_end]);
+                        var nodes = ArrayList(Node).init(self.alloc);
+                        while (try parser.next()) |node|
+                            try nodes.append(node);
+                        break :blk nodes;
                     };
+
+                    // Return function declaration
+                    defer self.index += body_end;
+                    return .{ .function_decl = .{ .name = name, .parameters = parameters.items, .body = body.items } };
+                },
+
+                // Function call
+                .identifier => {
+                    const next_token = self.tokens[self.index + 1];
+                    if (next_token.type == .left_paren) {
+                        // Get name of function
+                        const name = current.value;
+
+                        // Find parameters of function
+                        const params_start = self.index + 1;
+                        assert(self.tokens[params_start].type == .left_paren);
+                        const params_end = blk: {
+                            for (self.tokens[params_start..], 0..) |token, i|
+                                if (token.type == .right_paren) break :blk params_start + i;
+                            return error.FunctionCallMissingRightParen;
+                        };
+                        assert(self.tokens[params_end].type == .right_paren);
+
+                        // Parse arguments of function
+                        const arguments = blk: {
+                            var parser = Parser.init(self.alloc, self.tokens[params_start + 1 .. params_end]);
+                            var nodes = ArrayList(Node).init(self.alloc);
+                            while (try parser.next()) |node|
+                                try nodes.append(node);
+                            break :blk nodes;
+                        };
+
+                        // Return function call
+                        const semicolon_start = params_end + 1;
+                        assert(self.tokens[semicolon_start].type == .semicolon);
+                        defer self.index += semicolon_start;
+                        return .{ .function_call = .{ .name = name, .arguments = arguments.items } };
+                    }
                 },
 
                 // Value
