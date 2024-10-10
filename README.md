@@ -1,4 +1,4 @@
-= chad
+# chad
 
 This is my ideal programming language that I want to build:
 
@@ -12,7 +12,7 @@ This is my ideal programming language that I want to build:
 
 The language is ideal as a general purpose, highly concurrent applications
 that needs to run fast and be developed fast. It should be expressive meaning
-that little code is needed to express the ideas, simple macros / comptime without killing compile
+that little code is needed to express the ideas, simple macros or comptime without killing compile
 times. Development cycle should be fast, maximum 1 second cycle. Optimized
 for developer experience by being an expressive language with excellent edit cycle
 and great performance.
