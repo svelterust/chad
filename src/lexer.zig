@@ -113,9 +113,13 @@ pub fn lex(alloc: std.mem.Allocator, input: []const u8) !ArrayList(Token) {
 }
 
 test "lex" {
+    // Arena allocator is optimal for compilers
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const alloc = arena.allocator();
+
     // Lex input
     const input = @embedFile("examples/hello.chad");
-    var tokens = try lex(std.testing.allocator, input);
+    const tokens = try lex(alloc, input);
     std.debug.assert(tokens.items.len == 16);
-    defer tokens.deinit();
 }
