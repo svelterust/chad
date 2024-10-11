@@ -70,7 +70,7 @@ const Parser = struct {
                         // Find parameters of function
                         const params_start = self.index + 1;
                         assert(self.tokens[params_start].type == .left_paren);
-                        const params_end = try findToken(.right_paren, self.token, params_start);
+                        const params_end = findToken(.right_paren, self.tokens, params_start) orelse return error.FunctionMissingRightParen;
                         assert(self.tokens[params_end].type == .right_paren);
                         const arguments = try parse(self.alloc, self.tokens[params_start + 1 .. params_end]);
 
