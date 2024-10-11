@@ -6,15 +6,15 @@ const ArrayList = std.ArrayList;
 pub const Node = union(enum) {
     boolean: bool,
     number: i64,
-    string: []u8,
+    string: []const u8,
     function_call: struct {
-        name: []u8,
-        arguments: []Node,
+        name: []const u8,
+        arguments: []const Node,
     },
     function_decl: struct {
-        name: []u8,
-        parameters: []Node,
-        body: []Node,
+        name: []const u8,
+        parameters: []const Node,
+        body: []const Node,
     },
 };
 

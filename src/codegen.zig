@@ -4,25 +4,36 @@ const parser = @import("parser.zig");
 const assert = std.debug.assert;
 const ArrayList = std.ArrayList;
 
-pub fn generate(alloc: std.mem.Allocator, ast: []parser.Node) ![]u8 {
-    var codegen = CodeGen.init(alloc, ast);
+pub fn codegen(alloc: std.mem.Allocator, ast: []const parser.Node) ![]const u8 {
+    // Include header
     var buffer = std.ArrayList(u8).init(alloc);
-    while (try codegen.next()) |code|
-        try buffer.append(code);
+    try buffer.appendSlice("const std = @import(\"std\");\n\n");
+
+    // Generate code
+    const file = try generate(alloc, ast);
+    try buffer.appendSlice(file);
     return buffer.items;
 }
 
-const CodeGen = struct {
+fn generate(alloc: std.mem.Allocator, ast: []const parser.Node) anyerror![]const u8 {
+    var generator = Generator.init(alloc, ast);
+    var buffer = std.ArrayList(u8).init(alloc);
+    while (try generator.next()) |code|
+        try buffer.appendSlice(code);
+    return buffer.items;
+}
+
+const Generator = struct {
     alloc: std.mem.Allocator,
-    ast: []parser.Node,
+    ast: []const parser.Node,
     index: usize,
     indent: usize,
 
-    fn init(alloc: std.mem.Allocator, ast: []parser.Node) CodeGen {
-        return CodeGen{ .alloc = alloc, .ast = ast, .index = 0, .indent = 0 };
+    fn init(alloc: std.mem.Allocator, ast: []const parser.Node) Generator {
+        return Generator{ .alloc = alloc, .ast = ast, .index = 0, .indent = 0 };
     }
 
-    fn next(self: *CodeGen) !?[]u8 {
+    fn next(self: *Generator) !?[]const u8 {
         while (self.index < self.ast.len) {
             defer self.index += 1;
             const node = self.ast[self.index];
@@ -42,18 +53,49 @@ const CodeGen = struct {
                 .function_call => |function_call| {
                     // Write name and parameters
                     var buffer = std.ArrayList(u8).init(self.alloc);
-                    try buffer.append(function_call.name);
-                    try buffer.addOne('(');
-                    for (function_call.arguments) |argument| {
-                        const code = try generate(self.alloc, .{argument});
-                        try buffer.append(code);
+
+                    // If name is special, translate it
+                    if (std.mem.eql(u8, function_call.name, "print")) {
+                        try buffer.appendSlice("std.debug.print");
+                    } else {
+                        try buffer.appendSlice(function_call.name);
                     }
-                    try buffer.append(");\n");
+                    try buffer.append('(');
+                    for (function_call.arguments) |argument| {
+                        const code = try generate(self.alloc, &.{argument});
+                        try buffer.appendSlice(code);
+                    }
+                    try buffer.appendSlice(");\n");
                     return buffer.items;
                 },
-                else => {},
+                .function_decl => |function_decl| {
+                    // Write function declaration
+                    var buffer = std.ArrayList(u8).init(self.alloc);
+                    try buffer.appendSlice("fn ");
+                    try buffer.appendSlice(function_decl.name);
+                    try buffer.append('(');
+                    for (function_decl.parameters) |parameter| {
+                        const code = try generate(self.alloc, &.{parameter});
+                        try buffer.appendSlice(code);
+                    }
+                    try buffer.appendSlice(") void {\n");
+
+                    // Indend body
+                    self.indent += 4;
+                    for (function_decl.body) |body| {
+                        const code = try generate(self.alloc, &.{body});
+                        if (self.indent > 0) {
+                            try buffer.appendSlice("    ");
+                        }
+                        try buffer.appendSlice(code);
+                    }
+                    self.indent -= 4;
+                    try buffer.appendSlice("}\n");
+                    return buffer.items;
+                },
             }
         }
+        return null;
     }
 };
 
@@ -72,8 +114,7 @@ test "codegen" {
     const ast = try parser.parse(alloc, tokens.items);
 
     // Generate code
-    const code = try generate(alloc, ast.items);
-    try writer.print("Code:\n", .{});
+    const code = try codegen(alloc, ast.items);
     try writer.writeAll(code);
-    try writer.print("\n\n", .{});
+    try writer.print("\n", .{});
 }

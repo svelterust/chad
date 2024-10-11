@@ -4,7 +4,7 @@ const ArrayList = std.ArrayList;
 
 pub const Token = struct {
     type: TokenType,
-    value: []u8,
+    value: []const u8,
 };
 
 pub const TokenType = enum {
