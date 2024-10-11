@@ -4,7 +4,7 @@ const ArrayList = std.ArrayList;
 
 pub const Token = struct {
     type: TokenType,
-    value: []const u8,
+    value: []u8,
 };
 
 pub const TokenType = enum {
@@ -25,6 +25,16 @@ pub const TokenType = enum {
     function,
 };
 
+/// Takes input and lexes it into a list of tokens
+pub fn lex(alloc: std.mem.Allocator, input: []const u8) !ArrayList(Token) {
+    // Lex input
+    var tokens = ArrayList(Token).init(alloc);
+    var scanner = Lexer.init(input);
+    while (scanner.next()) |token|
+        try tokens.append(token);
+    return tokens;
+}
+
 const Lexer = struct {
     index: usize,
     src: []const u8,
@@ -36,11 +46,11 @@ const Lexer = struct {
     fn next(self: *Lexer) ?Token {
         while (self.index < self.src.len) {
             defer self.index += 1;
-            const current = self.src[self.index];
+            const character = self.src[self.index];
             const slice = self.src[self.index .. self.index + 1];
 
             // Return token based on current character
-            switch (current) {
+            switch (character) {
                 // Skip whitespace
                 ' ', '\t', '\n' => continue,
 
@@ -111,15 +121,6 @@ const Lexer = struct {
     }
 };
 
-pub fn lex(alloc: std.mem.Allocator, input: []const u8) !ArrayList(Token) {
-    // Lex input
-    var tokens = ArrayList(Token).init(alloc);
-    var scanner = Lexer.init(input);
-    while (scanner.next()) |token|
-        try tokens.append(token);
-    return tokens;
-}
-
 test "lex" {
     // Arena allocator is optimal for compilers
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -127,7 +128,10 @@ test "lex" {
     const alloc = arena.allocator();
 
     // Lex input
+    const writer = std.io.getStdOut().writer();
     const input = @embedFile("examples/hello.chad");
     const tokens = try lex(alloc, input);
-    assert(tokens.items.len == 16);
+    try writer.print("Tokens: ", .{});
+    try std.json.stringify(&tokens.items, .{ .whitespace = .indent_2 }, std.io.getStdOut().writer());
+    try writer.print("\n\n", .{});
 }

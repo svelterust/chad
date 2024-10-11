@@ -3,20 +3,35 @@ const lexer = @import("lexer.zig");
 const assert = std.debug.assert;
 const ArrayList = std.ArrayList;
 
-const Node = union(enum) {
+pub const Node = union(enum) {
     boolean: bool,
     number: i64,
-    string: []const u8,
+    string: []u8,
     function_call: struct {
-        name: []const u8,
-        arguments: []const Node,
+        name: []u8,
+        arguments: []Node,
     },
     function_decl: struct {
-        name: []const u8,
-        parameters: []const Node,
-        body: []const Node,
+        name: []u8,
+        parameters: []Node,
+        body: []Node,
     },
 };
+
+fn findToken(token_type: lexer.TokenType, tokens: []lexer.Token, offset: usize) ?usize {
+    for (tokens[offset..], 0..) |token, i|
+        if (token.type == token_type) return offset + i;
+    return null;
+}
+
+/// Takes a list of tokens and parses it into an Ast
+pub fn parse(alloc: std.mem.Allocator, tokens: []lexer.Token) anyerror!ArrayList(Node) {
+    var parser = Parser.init(alloc, tokens);
+    var nodes = ArrayList(Node).init(alloc);
+    while (try parser.next()) |node|
+        try nodes.append(node);
+    return nodes;
+}
 
 const Parser = struct {
     alloc: std.mem.Allocator,
@@ -30,10 +45,10 @@ const Parser = struct {
     fn next(self: *Parser) !?Node {
         while (self.index < self.tokens.len) {
             defer self.index += 1;
-            const current = self.tokens[self.index];
+            const token = self.tokens[self.index];
 
             // Return node based on current token
-            switch (current.type) {
+            switch (token.type) {
                 // Function
                 .function => {
                     // Name of function
@@ -65,7 +80,7 @@ const Parser = struct {
                     const next_token = self.tokens[self.index + 1];
                     if (next_token.type == .left_paren) {
                         // Get name of function
-                        const name = current.value;
+                        const name = token.value;
 
                         // Find parameters of function
                         const params_start = self.index + 1;
@@ -84,38 +99,24 @@ const Parser = struct {
 
                 // Value
                 .boolean => {
-                    const boolean = if (std.mem.eql(u8, current.value, "true")) true else false;
+                    const boolean = if (std.mem.eql(u8, token.value, "true")) true else false;
                     return .{ .boolean = boolean };
                 },
                 .number => {
-                    const number = try std.fmt.parseInt(i64, current.value, 10);
+                    const number = try std.fmt.parseInt(i64, token.value, 10);
                     return .{ .number = number };
                 },
                 .string => {
-                    return .{ .string = current.value };
+                    return .{ .string = token.value };
                 },
 
                 // Unexpected character
-                else => std.debug.print("Unexpected token: {}\n", .{current.type}),
+                else => std.debug.print("Unexpected token: {}\n", .{token.type}),
             }
         }
         return null;
     }
 };
-
-fn findToken(token_type: lexer.TokenType, tokens: []lexer.Token, offset: usize) ?usize {
-    for (tokens[offset..], 0..) |token, i|
-        if (token.type == token_type) return offset + i;
-    return null;
-}
-
-fn parse(alloc: std.mem.Allocator, tokens: []lexer.Token) anyerror!ArrayList(Node) {
-    var parser = Parser.init(alloc, tokens);
-    var nodes = ArrayList(Node).init(alloc);
-    while (try parser.next()) |node|
-        try nodes.append(node);
-    return nodes;
-}
 
 test "parse" {
     // Arena allocator is optimal for compilers
@@ -123,17 +124,12 @@ test "parse" {
     defer arena.deinit();
     const alloc = arena.allocator();
 
-    // Writer for debugging
-    const writer = std.io.getStdOut().writer();
-
     // Lex input
     const input = @embedFile("examples/hello.chad");
     const tokens = try lexer.lex(alloc, input);
-    try writer.print("Tokens: ", .{});
-    try std.json.stringify(&tokens.items, .{ .whitespace = .indent_2 }, writer);
-    try writer.print("\n\n", .{});
 
     // Parse tokens
+    const writer = std.io.getStdOut().writer();
     const ast = try parse(alloc, tokens.items);
     try writer.print("AST: ", .{});
     try std.json.stringify(&ast.items, .{ .whitespace = .indent_2 }, std.io.getStdOut().writer());
