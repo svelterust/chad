@@ -44,6 +44,13 @@ const Lexer = struct {
                 // Skip whitespace
                 ' ', '\t', '\n' => continue,
 
+                // Skip comments
+                '/' => if (self.src[self.index + 1] == '/') {
+                    // Find end of comment
+                    const newline = std.mem.indexOf(u8, self.src[self.index..], &.{'\n'}) orelse return null;
+                    self.index += newline;
+                },
+
                 // Single character tokens
                 '(' => return .{ .type = .left_paren, .value = slice },
                 ')' => return .{ .type = .right_paren, .value = slice },
