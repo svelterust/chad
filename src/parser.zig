@@ -44,40 +44,16 @@ const Parser = struct {
                     // Parameters of function
                     const args_start = self.index + 2;
                     assert(self.tokens[args_start].type == .left_paren);
-                    const args_end = blk: {
-                        for (self.tokens[args_start..], 0..) |token, i|
-                            if (token.type == .right_paren) break :blk args_start + i;
-                        return error.FunctionMissingRightParen;
-                    };
+                    const args_end = findToken(.right_paren, self.tokens, args_start) orelse return error.FunctionMissingRightParen;
                     assert(self.tokens[args_end].type == .right_paren);
-
-                    // Parse arguments to node
-                    const parameters = blk: {
-                        var parser = Parser.init(self.alloc, self.tokens[args_start + 1 .. args_end]);
-                        var nodes = ArrayList(Node).init(self.alloc);
-                        while (try parser.next()) |node|
-                            try nodes.append(node);
-                        break :blk nodes;
-                    };
+                    const parameters = try parse(self.alloc, self.tokens[args_start + 1 .. args_end]);
 
                     // Body of function
                     const body_start = args_end + 1;
                     assert(self.tokens[body_start].type == .left_brace);
-                    const body_end = blk: {
-                        for (self.tokens[body_start..], 0..) |token, i|
-                            if (token.type == .right_brace) break :blk body_start + i;
-                        return error.FunctionMissingRightBrace;
-                    };
+                    const body_end = findToken(.right_brace, self.tokens, body_start) orelse return error.FunctionMissingRightBrace;
                     assert(self.tokens[body_end].type == .right_brace);
-
-                    // Parse body of function
-                    const body = blk: {
-                        var parser = Parser.init(self.alloc, self.tokens[body_start + 1 .. body_end]);
-                        var nodes = ArrayList(Node).init(self.alloc);
-                        while (try parser.next()) |node|
-                            try nodes.append(node);
-                        break :blk nodes;
-                    };
+                    const body = try parse(self.alloc, self.tokens[body_start + 1 .. body_end]);
 
                     // Return function declaration
                     defer self.index += body_end;
@@ -94,21 +70,9 @@ const Parser = struct {
                         // Find parameters of function
                         const params_start = self.index + 1;
                         assert(self.tokens[params_start].type == .left_paren);
-                        const params_end = blk: {
-                            for (self.tokens[params_start..], 0..) |token, i|
-                                if (token.type == .right_paren) break :blk params_start + i;
-                            return error.FunctionCallMissingRightParen;
-                        };
+                        const params_end = try findToken(.right_paren, self.token, params_start);
                         assert(self.tokens[params_end].type == .right_paren);
-
-                        // Parse arguments of function
-                        const arguments = blk: {
-                            var parser = Parser.init(self.alloc, self.tokens[params_start + 1 .. params_end]);
-                            var nodes = ArrayList(Node).init(self.alloc);
-                            while (try parser.next()) |node|
-                                try nodes.append(node);
-                            break :blk nodes;
-                        };
+                        const arguments = try parse(self.alloc, self.tokens[params_start + 1 .. params_end]);
 
                         // Return function call
                         const semicolon_start = params_end + 1;
@@ -139,13 +103,18 @@ const Parser = struct {
     }
 };
 
-pub fn parse(alloc: std.mem.Allocator, tokens: []lexer.Token) !ArrayList(Node) {
-    // Parse tokens
+fn findToken(token_type: lexer.TokenType, tokens: []lexer.Token, offset: usize) ?usize {
+    for (tokens[offset..], 0..) |token, i|
+        if (token.type == token_type) return offset + i;
+    return null;
+}
+
+fn parse(alloc: std.mem.Allocator, tokens: []lexer.Token) anyerror!ArrayList(Node) {
     var parser = Parser.init(alloc, tokens);
-    var ast = ArrayList(Node).init(alloc);
+    var nodes = ArrayList(Node).init(alloc);
     while (try parser.next()) |node|
-        try ast.append(node);
-    return ast;
+        try nodes.append(node);
+    return nodes;
 }
 
 test "parse" {
