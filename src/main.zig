@@ -20,7 +20,29 @@ pub fn main() !void {
     const ast = try parser.parse(alloc, tokens.items);
     const output = try codegen.codegen(alloc, ast.items);
 
-    // Print file
-    const stdout = std.io.getStdOut().writer();
-    try stdout.print("{s}", .{output});
+    // Write file to tmp
+    const dir = "/tmp";
+    const name = "main.zig";
+    const tmp = try std.fs.openDirAbsolute(dir, .{});
+    try tmp.writeFile(.{
+        .sub_path = name,
+        .data = output,
+    });
+
+    // Execute with Zig
+    const result = try std.process.Child.run(.{
+        .cwd = dir,
+        .allocator = alloc,
+        .argv = &.{ "zig", "run", name },
+    });
+
+    // Display in terminal
+    if (result.stdout.len > 0) {
+        const stdout = std.io.getStdOut().writer();
+        try stdout.writeAll(result.stdout);
+    } else {
+        const stderr = std.io.getStdOut().writer();
+        try stderr.writeAll(output);
+        try stderr.writeAll(result.stderr);
+    }
 }

@@ -56,21 +56,25 @@ const Generator = struct {
 
                     // If name is special, translate it
                     if (std.mem.eql(u8, function_call.name, "print")) {
-                        try buffer.appendSlice("std.debug.print");
+                        try buffer.appendSlice("try std.io.getStdOut().writer().print(\"{any}\\n\", .{ ");
                     } else {
                         try buffer.appendSlice(function_call.name);
+                        try buffer.append('(');
                     }
-                    try buffer.append('(');
                     for (function_call.arguments) |argument| {
                         const code = try generate(self.alloc, &.{argument});
                         try buffer.appendSlice(code);
                     }
+                    if (std.mem.eql(u8, function_call.name, "print"))
+                        try buffer.appendSlice(" }");
                     try buffer.appendSlice(");\n");
                     return buffer.items;
                 },
                 .function_decl => |function_decl| {
                     // Write function declaration
                     var buffer = std.ArrayList(u8).init(self.alloc);
+                    if (std.mem.eql(u8, function_decl.name, "main"))
+                        try buffer.appendSlice("pub ");
                     try buffer.appendSlice("fn ");
                     try buffer.appendSlice(function_decl.name);
                     try buffer.append('(');
@@ -78,7 +82,7 @@ const Generator = struct {
                         const code = try generate(self.alloc, &.{parameter});
                         try buffer.appendSlice(code);
                     }
-                    try buffer.appendSlice(") void {\n");
+                    try buffer.appendSlice(") !void {\n");
 
                     // Indend body
                     self.indent += 4;
