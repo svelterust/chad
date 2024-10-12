@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
 
     // zig build
     const exe = b.addExecutable(.{
-        .name = "transpiler",
+        .name = "chad",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
