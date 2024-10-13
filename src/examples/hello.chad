@@ -1,5 +1,5 @@
 fn main() {
     let number = 123;
     let message = "Hello, World!";
-    // print("Hello, {number}!\n");
+    print("Hello, {number}!\n");
 }

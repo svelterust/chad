@@ -74,7 +74,7 @@ const Generator = struct {
                         try generate(self, &.{argument});
                     if (std.mem.eql(u8, function_call.name, "print"))
                         try writer.writeAll(" }");
-                    try writer.writeAll(");\n");
+                    try writer.writeAll(");");
                 },
 
                 // Function declaration
