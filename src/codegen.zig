@@ -51,6 +51,19 @@ const Generator = struct {
                 },
                 .string => |string| return string,
 
+                // Variables
+                .let => |let| {
+                    // Write name and parameters
+                    var buffer = std.ArrayList(u8).init(self.alloc);
+                    try buffer.appendSlice("const ");
+                    try buffer.appendSlice(let.name);
+                    try buffer.appendSlice(" = ");
+                    const code = try generate(self.alloc, &.{let.value.*});
+                    try buffer.appendSlice(code);
+                    try buffer.appendSlice(";\n");
+                    return buffer.items;
+                },
+
                 // Function call
                 .function_call => |function_call| {
                     // Write name and parameters

@@ -66,7 +66,7 @@ const Parser = struct {
                     return .{ .string = token.value };
                 },
 
-                // Let
+                // Variables
                 .let => {
                     // Name of variable
                     const name = self.tokens[self.index + 1];
