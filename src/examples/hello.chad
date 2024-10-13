@@ -1,6 +1,7 @@
 fn main() {
-    if false {
+    if true {
         print("Welcome to the jungle\n");
+    } else {
+        print("Not welcome to the jungle\n");
     }
-    print("Success!\n");
 }

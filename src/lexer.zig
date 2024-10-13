@@ -24,6 +24,7 @@ pub const TokenType = enum {
 
     // Keywords
     @"if",
+    @"else",
     let,
     function,
 };
@@ -98,6 +99,8 @@ const Lexer = struct {
                                 return .{ .type = .function, .value = identifier };
                             } else if (std.mem.eql(u8, identifier, "if")) {
                                 return .{ .type = .@"if", .value = identifier };
+                            } else if (std.mem.eql(u8, identifier, "else")) {
+                                return .{ .type = .@"else", .value = identifier };
                             } else if (std.mem.eql(u8, identifier, "let")) {
                                 return .{ .type = .let, .value = identifier };
                             } else if (std.mem.eql(u8, identifier, "true") or std.mem.eql(u8, identifier, "false")) {

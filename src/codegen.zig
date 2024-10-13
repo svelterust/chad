@@ -43,7 +43,6 @@ const Generator = struct {
     fn writeBody(self: *Generator, body: []const parser.Node) !void {
         var writer = self.buffer.writer();
         for (body) |node| {
-            try writer.writeAll("    ");
             try generate(self, &.{node});
             try writer.writeAll("\n");
         }
@@ -72,7 +71,13 @@ const Generator = struct {
                     try writer.writeAll(") {\n");
 
                     // Write body
-                    try self.writeBody(@"if".body);
+                    try self.writeBody(@"if".then);
+
+                    // Write else
+                    if (@"if".@"else") |@"else"| {
+                        try writer.writeAll(" else {\n");
+                        try self.writeBody(@"else");
+                    }
                 },
 
                 // Variables

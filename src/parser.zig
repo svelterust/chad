@@ -9,7 +9,8 @@ pub const Node = union(enum) {
     string: []const u8,
     @"if": struct {
         condition: *Node,
-        body: []const Node,
+        then: []const Node,
+        @"else": ?[]const Node,
     },
     let: struct {
         name: []const u8,
@@ -104,11 +105,24 @@ const Parser = struct {
                     // Body of if statement
                     const body_start = condition_end + 1;
                     const body_end = findClosingBrace(self.tokens, body_start) orelse return error.IfMissingRightBrace;
-                    const body = try parse(self.alloc, self.tokens[body_start..body_end]);
+                    const then = try parse(self.alloc, self.tokens[body_start..body_end]);
+
+                    // Try and parse else statement
+                    const @"else" = blk: {
+                        if (self.tokens[body_end + 1].type == .@"else") {
+                            const else_start = body_end + 3;
+                            const else_end = findClosingBrace(self.tokens, else_start) orelse return error.ElseMissingRightBrace;
+                            const @"else" = try parse(self.alloc, self.tokens[else_start..else_end]);
+                            self.index = else_end;
+                            break :blk @"else";
+                        } else {
+                            self.index = body_end;
+                            break :blk null;
+                        }
+                    };
 
                     // Return let statement
-                    defer self.index = body_end;
-                    return .{ .@"if" = .{ .condition = condition, .body = body.items } };
+                    return .{ .@"if" = .{ .condition = condition, .then = then.items, .@"else" = @"else".?.items } };
                 },
 
                 // Variables
@@ -124,7 +138,7 @@ const Parser = struct {
                     assert(self.tokens[self.index + 4].type == .semicolon);
 
                     // Return let statement
-                    defer self.index = value_start + 1;
+                    self.index = value_start + 1;
                     return .{ .let = .{ .name = name.value, .value = &value.items[0] } };
                 },
 
@@ -145,7 +159,7 @@ const Parser = struct {
                         // Return function call
                         const semicolon_start = params_end + 1;
                         assert(self.tokens[semicolon_start].type == .semicolon);
-                        defer self.index += semicolon_start;
+                        self.index += semicolon_start;
                         return .{ .function_call = .{ .name = name, .arguments = arguments.items } };
                     }
                 },
@@ -172,7 +186,7 @@ const Parser = struct {
                     const body = try parse(self.alloc, self.tokens[body_start + 1 .. body_end]);
 
                     // Return function declaration
-                    defer self.index += body_end;
+                    self.index += body_end;
                     return .{ .function_decl = .{ .name = name, .parameters = parameters.items, .body = body.items } };
                 },
 
