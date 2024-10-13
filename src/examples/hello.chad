@@ -1,4 +1,4 @@
-fn main() {                   // fn main() void {
-    print(123);               // const value = 123 + 456;
-    print("Hello, world!");   // var value = 1000 * 50;
-}                             // }
+fn main() {
+    let number = 123;
+    // print("Hello, {number}!\n");
+}

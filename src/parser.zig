@@ -7,6 +7,10 @@ pub const Node = union(enum) {
     boolean: bool,
     number: i64,
     string: []const u8,
+    let: struct {
+        name: []const u8,
+        value: *Node,
+    },
     function_call: struct {
         name: []const u8,
         arguments: []const Node,
@@ -97,6 +101,23 @@ const Parser = struct {
                     }
                 },
 
+                // Let
+                .let => {
+                    // Name of variable
+                    const name = self.tokens[self.index + 1];
+                    assert(name.type == .identifier);
+                    assert(self.tokens[self.index + 2].type == .eq);
+
+                    // Get value of variable
+                    const value_start = self.index + 3;
+                    const value = try parse(self.alloc, self.tokens[value_start .. value_start + 1]);
+                    assert(self.tokens[self.index + 4].type == .semicolon);
+
+                    // Return let statement
+                    defer self.index = value_start + 1;
+                    return .{ .let = .{ .name = name.value, .value = &value.items[0] } };
+                },
+
                 // Value
                 .boolean => {
                     const boolean = if (std.mem.eql(u8, token.value, "true")) true else false;
@@ -110,8 +131,11 @@ const Parser = struct {
                     return .{ .string = token.value };
                 },
 
-                // Unexpected character
-                else => std.debug.print("Unexpected token: {}\n", .{token.type}),
+                // Unexpected token
+                else => {
+                    std.debug.print("Unexpected token: {}\n", .{token.type});
+                    return error.UnexpectedToken;
+                },
             }
         }
         return null;

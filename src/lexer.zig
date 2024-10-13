@@ -14,6 +14,7 @@ pub const TokenType = enum {
     left_brace,
     right_brace,
     semicolon,
+    eq,
 
     // Literals
     string,
@@ -22,6 +23,7 @@ pub const TokenType = enum {
     identifier,
 
     // Keywords
+    let,
     function,
 };
 
@@ -30,7 +32,7 @@ pub fn lex(alloc: std.mem.Allocator, input: []const u8) !ArrayList(Token) {
     // Lex input
     var tokens = ArrayList(Token).init(alloc);
     var scanner = Lexer.init(input);
-    while (scanner.next()) |token|
+    while (try scanner.next()) |token|
         try tokens.append(token);
     return tokens;
 }
@@ -43,7 +45,7 @@ const Lexer = struct {
         return Lexer{ .index = 0, .src = input };
     }
 
-    fn next(self: *Lexer) ?Token {
+    fn next(self: *Lexer) !?Token {
         while (self.index < self.src.len) {
             defer self.index += 1;
             const character = self.src[self.index];
@@ -67,6 +69,7 @@ const Lexer = struct {
                 '{' => return .{ .type = .left_brace, .value = slice },
                 '}' => return .{ .type = .right_brace, .value = slice },
                 ';' => return .{ .type = .semicolon, .value = slice },
+                '=' => return .{ .type = .eq, .value = slice },
 
                 // String
                 '"' => {
@@ -92,6 +95,8 @@ const Lexer = struct {
                             // Check if identifier is a keyword
                             if (std.mem.eql(u8, identifier, "fn")) {
                                 return .{ .type = .function, .value = identifier };
+                            } else if (std.mem.eql(u8, identifier, "let")) {
+                                return .{ .type = .let, .value = identifier };
                             } else if (std.mem.eql(u8, identifier, "true") or std.mem.eql(u8, identifier, "false")) {
                                 return .{ .type = .boolean, .value = identifier };
                             } else {
@@ -114,7 +119,10 @@ const Lexer = struct {
                 },
 
                 // Unexpected character
-                else => std.debug.print("Unexpected character: {s}\n", .{slice}),
+                else => {
+                    std.debug.print("Unexpected character: {s}\n", .{slice});
+                    return error.UnexpectedCharacter;
+                },
             }
         }
         return null;
