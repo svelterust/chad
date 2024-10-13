@@ -53,30 +53,34 @@ const Parser = struct {
 
             // Return node based on current token
             switch (token.type) {
-                // Function
-                .function => {
-                    // Name of function
-                    const name_start = self.index + 1;
-                    assert(self.tokens[name_start].type == .identifier);
-                    const name = self.tokens[name_start].value;
+                // Value types
+                .boolean => {
+                    const boolean = if (std.mem.eql(u8, token.value, "true")) true else false;
+                    return .{ .boolean = boolean };
+                },
+                .number => {
+                    const number = try std.fmt.parseInt(i64, token.value, 10);
+                    return .{ .number = number };
+                },
+                .string => {
+                    return .{ .string = token.value };
+                },
 
-                    // Parameters of function
-                    const args_start = self.index + 2;
-                    assert(self.tokens[args_start].type == .left_paren);
-                    const args_end = findToken(.right_paren, self.tokens, args_start) orelse return error.FunctionMissingRightParen;
-                    assert(self.tokens[args_end].type == .right_paren);
-                    const parameters = try parse(self.alloc, self.tokens[args_start + 1 .. args_end]);
+                // Let
+                .let => {
+                    // Name of variable
+                    const name = self.tokens[self.index + 1];
+                    assert(name.type == .identifier);
+                    assert(self.tokens[self.index + 2].type == .eq);
 
-                    // Body of function
-                    const body_start = args_end + 1;
-                    assert(self.tokens[body_start].type == .left_brace);
-                    const body_end = findToken(.right_brace, self.tokens, body_start) orelse return error.FunctionMissingRightBrace;
-                    assert(self.tokens[body_end].type == .right_brace);
-                    const body = try parse(self.alloc, self.tokens[body_start + 1 .. body_end]);
+                    // Get value of variable
+                    const value_start = self.index + 3;
+                    const value = try parse(self.alloc, self.tokens[value_start .. value_start + 1]);
+                    assert(self.tokens[self.index + 4].type == .semicolon);
 
-                    // Return function declaration
-                    defer self.index += body_end;
-                    return .{ .function_decl = .{ .name = name, .parameters = parameters.items, .body = body.items } };
+                    // Return let statement
+                    defer self.index = value_start + 1;
+                    return .{ .let = .{ .name = name.value, .value = &value.items[0] } };
                 },
 
                 // Function call
@@ -101,34 +105,30 @@ const Parser = struct {
                     }
                 },
 
-                // Let
-                .let => {
-                    // Name of variable
-                    const name = self.tokens[self.index + 1];
-                    assert(name.type == .identifier);
-                    assert(self.tokens[self.index + 2].type == .eq);
+                // Function declaration
+                .function => {
+                    // Name of function
+                    const name_start = self.index + 1;
+                    assert(self.tokens[name_start].type == .identifier);
+                    const name = self.tokens[name_start].value;
 
-                    // Get value of variable
-                    const value_start = self.index + 3;
-                    const value = try parse(self.alloc, self.tokens[value_start .. value_start + 1]);
-                    assert(self.tokens[self.index + 4].type == .semicolon);
+                    // Parameters of function
+                    const args_start = self.index + 2;
+                    assert(self.tokens[args_start].type == .left_paren);
+                    const args_end = findToken(.right_paren, self.tokens, args_start) orelse return error.FunctionMissingRightParen;
+                    assert(self.tokens[args_end].type == .right_paren);
+                    const parameters = try parse(self.alloc, self.tokens[args_start + 1 .. args_end]);
 
-                    // Return let statement
-                    defer self.index = value_start + 1;
-                    return .{ .let = .{ .name = name.value, .value = &value.items[0] } };
-                },
+                    // Body of function
+                    const body_start = args_end + 1;
+                    assert(self.tokens[body_start].type == .left_brace);
+                    const body_end = findToken(.right_brace, self.tokens, body_start) orelse return error.FunctionMissingRightBrace;
+                    assert(self.tokens[body_end].type == .right_brace);
+                    const body = try parse(self.alloc, self.tokens[body_start + 1 .. body_end]);
 
-                // Value
-                .boolean => {
-                    const boolean = if (std.mem.eql(u8, token.value, "true")) true else false;
-                    return .{ .boolean = boolean };
-                },
-                .number => {
-                    const number = try std.fmt.parseInt(i64, token.value, 10);
-                    return .{ .number = number };
-                },
-                .string => {
-                    return .{ .string = token.value };
+                    // Return function declaration
+                    defer self.index += body_end;
+                    return .{ .function_decl = .{ .name = name, .parameters = parameters.items, .body = body.items } };
                 },
 
                 // Unexpected token

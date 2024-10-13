@@ -50,6 +50,8 @@ const Generator = struct {
                     return output;
                 },
                 .string => |string| return string,
+
+                // Function call
                 .function_call => |function_call| {
                     // Write name and parameters
                     var buffer = std.ArrayList(u8).init(self.alloc);
@@ -70,6 +72,8 @@ const Generator = struct {
                     try buffer.appendSlice(");\n");
                     return buffer.items;
                 },
+
+                // Function declaration
                 .function_decl => |function_decl| {
                     // Write function declaration
                     var buffer = std.ArrayList(u8).init(self.alloc);
