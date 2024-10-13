@@ -66,7 +66,7 @@ const Generator = struct {
                 .function_call => |function_call| {
                     // If name is special, translate it
                     if (std.mem.eql(u8, function_call.name, "print")) {
-                        try writer.writeAll("try std.io.getStdOut().writer().print(\"{any}\\n\", .{ ");
+                        try writer.writeAll("try std.io.getStdOut().writer().print(\"{s}\", .{ ");
                     } else {
                         try writer.print("{s}(", .{function_call.name});
                     }
@@ -87,7 +87,7 @@ const Generator = struct {
                         try generate(self, &.{parameter});
                     try writer.writeAll(") !void {\n");
 
-                    // Indend body
+                    // Indent body
                     for (function_decl.body) |body| {
                         try writer.writeAll("    ");
                         try generate(self, &.{body});

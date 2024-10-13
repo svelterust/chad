@@ -23,6 +23,7 @@ pub const TokenType = enum {
     identifier,
 
     // Keywords
+    @"if",
     let,
     function,
 };
@@ -95,6 +96,8 @@ const Lexer = struct {
                             // Check if identifier is a keyword
                             if (std.mem.eql(u8, identifier, "fn")) {
                                 return .{ .type = .function, .value = identifier };
+                            } else if (std.mem.eql(u8, identifier, "if")) {
+                                return .{ .type = .@"if", .value = identifier };
                             } else if (std.mem.eql(u8, identifier, "let")) {
                                 return .{ .type = .let, .value = identifier };
                             } else if (std.mem.eql(u8, identifier, "true") or std.mem.eql(u8, identifier, "false")) {

@@ -7,6 +7,10 @@ pub const Node = union(enum) {
     boolean: bool,
     number: i64,
     string: []const u8,
+    @"if": struct {
+        condition: *Node,
+        body: []const Node,
+    },
     let: struct {
         name: []const u8,
         value: *Node,
@@ -22,10 +26,32 @@ pub const Node = union(enum) {
     },
 };
 
+// Helpers for finding token
 fn findToken(token_type: lexer.TokenType, tokens: []lexer.Token, offset: usize) ?usize {
     for (tokens[offset..], 0..) |token, i|
         if (token.type == token_type) return offset + i;
     return null;
+}
+
+fn findClosingPair(pairs: [2]lexer.TokenType, tokens: []lexer.Token, offset: usize) ?usize {
+    var count: usize = 1;
+    for (tokens[offset + 1 ..], 0..) |token, i| {
+        if (token.type == pairs[0]) {
+            count += 1;
+        } else if (token.type == pairs[1]) {
+            count -= 1;
+            if (count == 0) return offset + i + 1;
+        }
+    }
+    return null;
+}
+
+fn findClosingBrace(tokens: []lexer.Token, offset: usize) ?usize {
+    return findClosingPair(.{ .left_brace, .right_brace }, tokens, offset);
+}
+
+fn findClosingParen(tokens: []lexer.Token, offset: usize) ?usize {
+    return findClosingPair(.{ .left_paren, .right_paren }, tokens, offset);
 }
 
 /// Takes a list of tokens and parses it into an Ast
@@ -67,6 +93,24 @@ const Parser = struct {
                 },
 
                 // Variables
+                .@"if" => {
+                    // Condition of if statement
+                    const condition_start = self.index + 1;
+                    const condition_end = findToken(.left_brace, self.tokens, condition_start) orelse return error.IfMissingLeftBrace;
+                    const conditions = try parse(self.alloc, self.tokens[condition_start..condition_end]);
+                    assert(conditions.items.len == 1);
+                    const condition = &conditions.items[0];
+
+                    // Body of if statement
+                    const body_start = condition_end + 1;
+                    const body_end = findClosingBrace(self.tokens, body_start) orelse return error.IfMissingRightBrace;
+                    const body = try parse(self.alloc, self.tokens[body_start..body_end]);
+
+                    // Return let statement
+                    defer self.index = body_end + 1;
+                    return .{ .@"if" = .{ .condition = condition, .body = body.items } };
+                },
+
                 .let => {
                     // Name of variable
                     const name = self.tokens[self.index + 1];
@@ -93,7 +137,7 @@ const Parser = struct {
                         // Find parameters of function
                         const params_start = self.index + 1;
                         assert(self.tokens[params_start].type == .left_paren);
-                        const params_end = findToken(.right_paren, self.tokens, params_start) orelse return error.FunctionMissingRightParen;
+                        const params_end = findClosingParen(self.tokens, params_start) orelse return error.FunctionMissingRightParen;
                         assert(self.tokens[params_end].type == .right_paren);
                         const arguments = try parse(self.alloc, self.tokens[params_start + 1 .. params_end]);
 
@@ -115,14 +159,14 @@ const Parser = struct {
                     // Parameters of function
                     const args_start = self.index + 2;
                     assert(self.tokens[args_start].type == .left_paren);
-                    const args_end = findToken(.right_paren, self.tokens, args_start) orelse return error.FunctionMissingRightParen;
+                    const args_end = findClosingParen(self.tokens, args_start) orelse return error.FunctionMissingRightParen;
                     assert(self.tokens[args_end].type == .right_paren);
                     const parameters = try parse(self.alloc, self.tokens[args_start + 1 .. args_end]);
 
                     // Body of function
                     const body_start = args_end + 1;
                     assert(self.tokens[body_start].type == .left_brace);
-                    const body_end = findToken(.right_brace, self.tokens, body_start) orelse return error.FunctionMissingRightBrace;
+                    const body_end = findClosingBrace(self.tokens, body_start) orelse return error.FunctionMissingRightBrace;
                     assert(self.tokens[body_end].type == .right_brace);
                     const body = try parse(self.alloc, self.tokens[body_start + 1 .. body_end]);
 
