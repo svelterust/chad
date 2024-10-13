@@ -40,6 +40,16 @@ const Generator = struct {
         };
     }
 
+    fn writeBody(self: *Generator, body: []const parser.Node) !void {
+        var writer = self.buffer.writer();
+        for (body) |node| {
+            try writer.writeAll("    ");
+            try generate(self, &.{node});
+            try writer.writeAll("\n");
+        }
+        try writer.writeAll("}");
+    }
+
     fn next(self: *Generator) anyerror!void {
         // Get writer
         var writer = self.buffer.writer();
@@ -53,6 +63,17 @@ const Generator = struct {
                 .boolean => |boolean| try writer.print("{}", .{boolean}),
                 .number => |number| try writer.print("{d}", .{number}),
                 .string => |string| try writer.writeAll(string),
+
+                // If-statement
+                .@"if" => |@"if"| {
+                    // Write statement
+                    try writer.writeAll("if (");
+                    try generate(self, &.{@"if".condition.*});
+                    try writer.writeAll(") {\n");
+
+                    // Write body
+                    try self.writeBody(@"if".body);
+                },
 
                 // Variables
                 .let => |let| {
@@ -87,13 +108,8 @@ const Generator = struct {
                         try generate(self, &.{parameter});
                     try writer.writeAll(") !void {\n");
 
-                    // Indent body
-                    for (function_decl.body) |body| {
-                        try writer.writeAll("    ");
-                        try generate(self, &.{body});
-                        try writer.writeAll("\n");
-                    }
-                    try writer.writeAll("}\n");
+                    // Write body
+                    try self.writeBody(function_decl.body);
                 },
             }
         }

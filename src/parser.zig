@@ -92,7 +92,7 @@ const Parser = struct {
                     return .{ .string = token.value };
                 },
 
-                // Variables
+                // If-statement
                 .@"if" => {
                     // Condition of if statement
                     const condition_start = self.index + 1;
@@ -107,10 +107,11 @@ const Parser = struct {
                     const body = try parse(self.alloc, self.tokens[body_start..body_end]);
 
                     // Return let statement
-                    defer self.index = body_end + 1;
+                    defer self.index = body_end;
                     return .{ .@"if" = .{ .condition = condition, .body = body.items } };
                 },
 
+                // Variables
                 .let => {
                     // Name of variable
                     const name = self.tokens[self.index + 1];
